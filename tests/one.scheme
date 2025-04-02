@@ -1,0 +1,16 @@
+package users
+
+service User {
+    CreateUser (Crededentials, OtherArg): string
+    VoidFunction: nil
+    MultipleResults (): (First, Second, Third)
+}
+
+struct Crededentials {
+    Username string
+    Password string
+}
+struct OtherArg {
+    Username string
+    Password string
+}
