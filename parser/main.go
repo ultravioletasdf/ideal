@@ -2,15 +2,20 @@ package parser
 
 import (
 	"fmt"
-	"log"
 	"os"
-	"serializer/lexer"
+
+	"idl/lexer"
 )
 
 type Nodes struct {
 	Package    string
+	Options    []OptionNode
 	Services   []ServiceNode
 	Structures []StructureNode
+}
+type OptionNode struct {
+	Name  string
+	Value string
 }
 type ServiceNode struct {
 	Name      string
@@ -58,6 +63,29 @@ func (p *Parser) parsePackage() string {
 		unexpected(tok, "package", tok.Value)
 	}
 	return p.next().Value
+}
+func (p *Parser) parseOption() OptionNode {
+	tok := p.next()
+	if tok.Type != lexer.Option {
+		unexpected(tok, "option", tok.Value)
+	}
+	name := p.next()
+	q1 := p.next()
+	value := p.next()
+	q2 := p.next()
+	if q1.Type != lexer.Quote {
+		unexpected(q1, "\"", q1.Value)
+	}
+	if name.Type != lexer.Identifier {
+		unexpected(name, "identifier", name.Value)
+	}
+	if value.Type != lexer.Identifier {
+		unexpected(value, "identifier", value.Value)
+	}
+	if q2.Type != lexer.Quote {
+		unexpected(q2, "\"", q2.Value)
+	}
+	return OptionNode{Name: name.Value, Value: value.Value}
 }
 func (p *Parser) parseService() ServiceNode {
 	tok := p.next()
@@ -111,7 +139,8 @@ func (p *Parser) parseList() (list []string) {
 				continue
 			} else {
 				unexpected(token, ",", token.Value)
-				log.Fatal("Expected Comma")
+				fmt.Println("Expected Comma")
+				os.Exit(1)
 			}
 		}
 		if token.Type == lexer.Identifier {
@@ -135,8 +164,13 @@ func (p *Parser) parseStruct() StructureNode {
 	for p.peek().Type != lexer.RightBrace {
 		one := p.next()
 		two := p.next()
+		if one.Pos.Line != two.Pos.Line {
+			fmt.Printf("%d:%d Must follow format: FieldName type\n", one.Pos.Line, one.Pos.Column)
+			os.Exit(1)
+		}
 		if one.Type != lexer.Identifier || two.Type != lexer.Identifier {
-			log.Fatalf("Expected two identifiers, got %v and %v", one, two)
+			fmt.Printf("%d:%d Expected two identifiers, got %v and %v\n", one.Pos.Line, one.Pos.Column, one.Value, two.Value)
+			os.Exit(1)
 		}
 		fields = append(fields, FieldNode{Name: one.Value, Type: two.Value})
 	}
@@ -146,21 +180,24 @@ func (p *Parser) parseStruct() StructureNode {
 func (p *Parser) Parse() Nodes {
 	var pkg = p.parsePackage()
 
+	var options []OptionNode
 	var services []ServiceNode
 	var structs []StructureNode
 
 	for t := p.peek(); t.Type != lexer.EndOfFile; t = p.peek() {
-		if t.Type == lexer.Service {
+		switch t.Type {
+		case lexer.Option:
+			options = append(options, p.parseOption())
+		case lexer.Service:
 			services = append(services, p.parseService())
-		} else if t.Type == lexer.Structure {
+		case lexer.Structure:
 			structs = append(structs, p.parseStruct())
-		} else {
-			unexpected(t, "service", t.Value)
-			log.Fatalf("Unexpected token: %v, expected service or struct", t.Value)
+		default:
+			unexpected(t, "service or struct", t.Value)
 		}
 	}
 
-	return Nodes{Package: pkg, Services: services, Structures: structs}
+	return Nodes{Package: pkg, Options: options, Services: services, Structures: structs}
 }
 func unexpected(token lexer.Token, expected, unexpected string) {
 	fmt.Printf("%d:%d Unexpected token '%v', expected '%v'\n", token.Pos.Line, token.Pos.Column, unexpected, expected)

@@ -2,7 +2,9 @@ package lexer
 
 import (
 	"bufio"
+	"fmt"
 	"io"
+	"os"
 	"unicode"
 )
 
@@ -11,6 +13,7 @@ type Type int
 const (
 	Service      Type = iota // service
 	Package                  // package
+	Option                   // option
 	Structure                // struct
 	LeftBrace                // {
 	RightBrace               // }
@@ -19,6 +22,7 @@ const (
 	EndOfFile                // EOF
 	Colon                    // :
 	Comma                    // ,
+	Quote                    // "
 	Identifier
 	Illegal // Unrecognized character
 )
@@ -34,8 +38,9 @@ type Position struct {
 	Column int
 }
 type Lexer struct {
-	pos    Position
-	reader *bufio.Reader
+	pos               Position
+	reader            *bufio.Reader
+	unterminatedQuote bool
 }
 
 func New(reader io.Reader) *Lexer {
@@ -60,34 +65,42 @@ func (l *Lexer) Lex() Token {
 		case '#':
 			l.skipLine()
 		case '{':
-			return Token{Type: LeftBrace, Pos: l.pos}
+			return Token{Type: LeftBrace, Pos: l.pos, Value: "{"}
 		case '}':
-			return Token{Type: RightBrace, Pos: l.pos}
+			return Token{Type: RightBrace, Pos: l.pos, Value: "}"}
 		case '(':
-			return Token{Type: LeftBracket, Pos: l.pos}
+			return Token{Type: LeftBracket, Pos: l.pos, Value: "("}
 		case ')':
-			return Token{Type: RightBracket, Pos: l.pos}
+			return Token{Type: RightBracket, Pos: l.pos, Value: ")"}
 		case ':':
-			return Token{Type: Colon, Pos: l.pos}
+			return Token{Type: Colon, Pos: l.pos, Value: ":"}
 		case ',':
-			return Token{Type: Comma, Pos: l.pos}
+			return Token{Type: Comma, Pos: l.pos, Value: ","}
+		case '"':
+			l.unterminatedQuote = !l.unterminatedQuote
+			return Token{Type: Quote, Pos: l.pos, Value: "\""}
 		default:
 			if unicode.IsSpace(r) {
 				continue
-			} else if unicode.IsLetter(r) {
+			} else if l.unterminatedQuote || unicode.IsLetter(r) || r == '_' {
 				// backup and let lexIdent rescan the beginning of the ident
 				startPos := l.pos
 				l.backup()
 				lit := l.lexIdent()
-				if lit == "package" {
-					return Token{Type: Package, Pos: startPos}
-				} else if lit == "service" {
-					return Token{Type: Service, Pos: startPos}
-				} else if lit == "struct" {
-					return Token{Type: Structure, Pos: startPos}
+				switch lit {
+				case "package":
+					return Token{Type: Package, Pos: startPos, Value: "package"}
+				case "service":
+					return Token{Type: Service, Pos: startPos, Value: "service"}
+				case "struct":
+					return Token{Type: Structure, Pos: startPos, Value: "struct"}
+				case "option":
+					return Token{Type: Option, Pos: startPos, Value: "option"}
 				}
 				return Token{Type: Identifier, Value: lit, Pos: startPos}
 			} else {
+				fmt.Printf("%d:%d Illegal token '%s'\n", l.pos.Line, l.pos.Column, string(r))
+				os.Exit(1)
 				return Token{Type: Illegal, Value: string(r), Pos: l.pos}
 			}
 		}
@@ -112,7 +125,10 @@ func (l *Lexer) lexIdent() string {
 		}
 
 		l.pos.Column++
-		if unicode.IsLetter(r) {
+		if r == '"' {
+			l.backup()
+			return lit
+		} else if l.unterminatedQuote || unicode.IsLetter(r) || r == '_' {
 			lit = lit + string(r)
 		} else {
 			// scanned something not in the identifier

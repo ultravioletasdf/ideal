@@ -1,5 +1,7 @@
 package users
 
+option go_out "customOutFolder/subfolder"
+
 service User {
     CreateUser (Crededentials, OtherArg): string
     VoidFunction: nil
@@ -13,4 +15,13 @@ struct Crededentials {
 struct OtherArg {
     Username string
     Password string
+}
+struct First {
+    Info string
+}
+struct Second {
+    Info string
+}
+struct Third {
+    Info int
 }

@@ -3,8 +3,9 @@ package validator
 import (
 	"errors"
 	"fmt"
-	"serializer/parser"
 	"slices"
+
+	"idl/parser"
 )
 
 var known = []string{"string", "nil", "int", "bool"}
@@ -15,9 +16,11 @@ type Validator struct {
 }
 
 func (v *Validator) Validate() error {
+	fmt.Println("Validating structures...")
 	if err := v.validateStructs(); err != nil {
 		return err
 	}
+	fmt.Println("Validating services...")
 	return v.validateServices()
 }
 func (v *Validator) validateStructs() error {
