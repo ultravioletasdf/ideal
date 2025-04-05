@@ -72,15 +72,25 @@ func (c *Compiler) compileStructs() {
 		data += fmt.Sprintf("\nfunc (d *%s) Decode(bin []byte) {\n", structure.Name)
 		var offset int
 		for _, field := range structure.Fields {
-			if field.Type == "string" {
-				data += fmt.Sprintf("\td.%s = string(bin[%d:%d])\n", field.Name, offset, offset+8)
+			switch field.Type {
+			case "string":
+				data += fmt.Sprintf("\td.%s = string(bin[%d:%d])\n", field.Name, offset, offset+64)
+				offset += 64
+			case "int64":
+				data += fmt.Sprintf("\td.%s = int64(binary.LittleEndian.Uint64(bin[%d:%d]))\n", field.Name, offset, offset+8)
 				offset += 8
-			} else {
-				data += fmt.Sprintf("\td.%s, _ = binary.Varint(bin[%d:%d])\n", field.Name, offset, offset+8)
-				offset += 8
+			case "int32":
+				data += fmt.Sprintf("\td.%s = int32(binary.LittleEndian.Uint32(bin[%d:%d]))\n", field.Name, offset, offset+4)
+				offset += 4
+			case "int16":
+				data += fmt.Sprintf("\td.%s = int16(binary.LittleEndian.Uint16(bin[%d:%d]))\n", field.Name, offset, offset+2)
+				offset += 2
+			case "int8":
+				data += fmt.Sprintf("\td.%s = int8(bin[%d])\n", field.Name, offset)
+				offset += 1
 			}
 		}
-		data += "\n}\n"
+		data += "}\n"
 
 		_, err := fmt.Fprint(c.file, data)
 		if err != nil {

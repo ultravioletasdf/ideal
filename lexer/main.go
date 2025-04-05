@@ -82,7 +82,7 @@ func (l *Lexer) Lex() Token {
 		default:
 			if unicode.IsSpace(r) {
 				continue
-			} else if l.unterminatedQuote || unicode.IsLetter(r) || r == '_' {
+			} else if l.unterminatedQuote || unicode.IsLetter(r) || unicode.IsNumber(r) || r == '_' {
 				// backup and let lexIdent rescan the beginning of the ident
 				startPos := l.pos
 				l.backup()
@@ -128,7 +128,7 @@ func (l *Lexer) lexIdent() string {
 		if r == '"' {
 			l.backup()
 			return lit
-		} else if l.unterminatedQuote || unicode.IsLetter(r) || r == '_' {
+		} else if l.unterminatedQuote || unicode.IsLetter(r) || unicode.IsNumber(r) || r == '_' {
 			lit = lit + string(r)
 		} else {
 			// scanned something not in the identifier

@@ -11,7 +11,7 @@ service User {
 struct Crededentials {
     Username string
     Password string
-    Thing int
+    Thing int8
 }
 struct OtherArg {
     Username string
