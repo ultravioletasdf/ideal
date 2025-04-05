@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"os"
 
-	compile_go "idl/languages/go"
-	"idl/lexer"
-	"idl/parser"
-	"idl/validator"
+	compile_go "github.com/ultravioletasdf/idl/languages/go"
+	"github.com/ultravioletasdf/idl/lexer"
+	"github.com/ultravioletasdf/idl/parser"
+	"github.com/ultravioletasdf/idl/validator"
 )
 
 var dtokens = flag.Bool("dtokens", false, "Specify whether to show debug information for tokenization")

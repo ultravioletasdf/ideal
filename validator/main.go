@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"slices"
 
-	"idl/parser"
+	"github.com/ultravioletasdf/idl/parser"
 )
 
 var known = []string{"string", "nil", "int", "int8", "int16", "int32", "int64", "bool"}

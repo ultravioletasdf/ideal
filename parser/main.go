@@ -3,8 +3,9 @@ package parser
 import (
 	"fmt"
 	"os"
+	"unicode"
 
-	"idl/lexer"
+	"github.com/ultravioletasdf/idl/lexer"
 )
 
 type Nodes struct {
@@ -70,22 +71,30 @@ func (p *Parser) parseOption() OptionNode {
 		unexpected(tok, "option", tok.Value)
 	}
 	name := p.next()
-	q1 := p.next()
-	value := p.next()
-	q2 := p.next()
-	if q1.Type != lexer.Quote {
-		unexpected(q1, "\"", q1.Value)
-	}
 	if name.Type != lexer.Identifier {
 		unexpected(name, "identifier", name.Value)
 	}
-	if value.Type != lexer.Identifier {
-		unexpected(value, "identifier", value.Value)
+	if t := p.peek(); t.Type == lexer.Identifier {
+		if !isDigitsOnly(t.Value) {
+			unexpected(t, "a postive integer", t.Value)
+		}
+		return OptionNode{Name: name.Value, Value: p.next().Value}
+	} else {
+		q1 := p.next()
+		value := p.next()
+		q2 := p.next()
+		if q1.Type != lexer.Quote {
+			unexpected(q1, "\"", q1.Value)
+		}
+		if value.Type != lexer.Identifier {
+			unexpected(value, "identifier", value.Value)
+		}
+		if q2.Type != lexer.Quote {
+			unexpected(q2, "\"", q2.Value)
+		}
+		return OptionNode{Name: name.Value, Value: value.Value}
 	}
-	if q2.Type != lexer.Quote {
-		unexpected(q2, "\"", q2.Value)
-	}
-	return OptionNode{Name: name.Value, Value: value.Value}
+
 }
 func (p *Parser) parseService() ServiceNode {
 	tok := p.next()
@@ -202,4 +211,12 @@ func (p *Parser) Parse() Nodes {
 func unexpected(token lexer.Token, expected, unexpected string) {
 	fmt.Printf("%d:%d Unexpected token '%v', expected '%v'\n", token.Pos.Line, token.Pos.Column, unexpected, expected)
 	os.Exit(1)
+}
+func isDigitsOnly(s string) bool {
+	for _, r := range s {
+		if !unicode.IsDigit(r) {
+			return false
+		}
+	}
+	return len(s) > 0
 }

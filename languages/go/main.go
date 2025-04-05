@@ -2,9 +2,11 @@ package compile_go
 
 import (
 	"fmt"
-	"idl/parser"
 	"os"
 	"path"
+	"strconv"
+
+	"github.com/ultravioletasdf/idl/parser"
 )
 
 type Compiler struct {
@@ -21,11 +23,7 @@ func (c *Compiler) Close() error {
 }
 func (c *Compiler) Compile() {
 	fmt.Println("Compiling for go...")
-	out := c.tree.Package
-	optionOut := c.option("go_out")
-	if optionOut != "" {
-		out = optionOut
-	}
+	out := c.option("go_out", c.tree.Package)
 	err := os.MkdirAll(out, os.ModePerm)
 	if err != nil {
 		panic(err)
@@ -37,17 +35,22 @@ func (c *Compiler) Compile() {
 	c.file = file
 	c.compileStructs()
 }
-func (c *Compiler) option(name string) string {
+func (c *Compiler) option(name, _default string) string {
 	for opt := range c.tree.Options {
 		if c.tree.Options[opt].Name == name {
 			return c.tree.Options[opt].Value
 		}
 	}
-	return ""
+	return _default
 }
 
 func (c *Compiler) compileStructs() {
-	_, err := fmt.Fprintf(c.file, "package %s\n\nimport \"encoding/binary\"\n\n", c.tree.Package)
+	_stringSize := c.option("string_size", "64")
+	stringSize, err := strconv.Atoi(_stringSize)
+	if err != nil {
+		panic("Error converting string_size to an integer:" + err.Error())
+	}
+	_, err = fmt.Fprintf(c.file, "package %s\n\nimport \"encoding/binary\"\n\n", c.tree.Package)
 	if err != nil {
 		panic(err)
 	}
@@ -62,7 +65,7 @@ func (c *Compiler) compileStructs() {
 		data += fmt.Sprintf("}\nfunc (d *%s) Encode() ([]byte, error) {\n\tvar bin []byte\n\tvar err error\n", structure.Name)
 		for _, field := range structure.Fields {
 			if field.Type == "string" {
-				data += fmt.Sprintf("\t%s := make([]byte, 64)\n\tcopy(%s[:], []byte(d.%s))\n\tbin, err = binary.Append(bin, binary.LittleEndian, %s)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n", field.Name, field.Name, field.Name, field.Name)
+				data += fmt.Sprintf("\t%s := make([]byte, %d)\n\tcopy(%s[:], []byte(d.%s))\n\tbin, err = binary.Append(bin, binary.LittleEndian, %s)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n", field.Name, stringSize, field.Name, field.Name, field.Name)
 			} else {
 				data += fmt.Sprintf("\tbin, err = binary.Append(bin, binary.LittleEndian, d.%s)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n", field.Name)
 			}
@@ -74,8 +77,8 @@ func (c *Compiler) compileStructs() {
 		for _, field := range structure.Fields {
 			switch field.Type {
 			case "string":
-				data += fmt.Sprintf("\td.%s = string(bin[%d:%d])\n", field.Name, offset, offset+64)
-				offset += 64
+				data += fmt.Sprintf("\td.%s = string(bin[%d:%d])\n", field.Name, offset, offset+stringSize)
+				offset += stringSize
 			case "int64":
 				data += fmt.Sprintf("\td.%s = int64(binary.LittleEndian.Uint64(bin[%d:%d]))\n", field.Name, offset, offset+8)
 				offset += 8
