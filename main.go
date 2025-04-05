@@ -53,7 +53,7 @@ func main() {
 	}
 	fmt.Println("No errors were detected")
 	if *compileGo {
-		compiler := compile_go.New(tree)
+		compiler := compile_go.New("one", tree)
 		compiler.Compile()
 	}
 	fmt.Println("Done!")

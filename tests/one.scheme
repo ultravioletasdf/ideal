@@ -1,6 +1,6 @@
 package users
 
-option go_out "customOutFolder/subfolder"
+option go_out "tests_out"
 
 service User {
     CreateUser (Crededentials, OtherArg): string
@@ -11,6 +11,7 @@ service User {
 struct Crededentials {
     Username string
     Password string
+    Thing int
 }
 struct OtherArg {
     Username string
