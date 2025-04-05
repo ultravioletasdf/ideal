@@ -47,7 +47,7 @@ struct Session {
 Building
 ```sh
 go build .
-./idl --go
+./idl --go file.scheme
 ```
 
 Encoding/decoding
