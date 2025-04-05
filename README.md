@@ -58,7 +58,7 @@ bytes, err := creds.Encode() // Encode creds to bytes using fixed width strings 
 if err != nil {
 	panic(err)
 }
-// Compress using lz4 (makes this example 64->32 bits) - DOES NOT WORK WHEN string_size IS NOT A MULTIPLE OF 8
+// Compress using lz4 (makes this example 128->43 bits) - DOES NOT WORK WHEN string_size IS NOT A MULTIPLE OF 8
 compressed := make([]byte, len(bytes))
 sizeCompresed, err := lz4.CompressBlockHC(bytes, compressed, 0)
 if err != nil {
