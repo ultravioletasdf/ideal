@@ -6,6 +6,12 @@ It is supposed to replace protobufs, by requiring less boilerplate, more go like
 
 It is intended to be used for RPC in the future
 
+## Install
+
+To install, run
+```sh
+go install github.com/ultravioletasdf/ideal@latest
+```
 ## Issues
 
 - strings over "string_size" are cut off
@@ -47,8 +53,7 @@ struct Session {
 
 Building
 ```sh
-go build .
-./ideal --go file.idl
+ideal --go file.idl
 ```
 
 Encoding/decoding
