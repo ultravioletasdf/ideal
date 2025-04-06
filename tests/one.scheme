@@ -12,6 +12,7 @@ service User {
 struct Crededentials {
     Username string
     Password string
+    Admin bool
 }
 struct OtherArg {
     Username string

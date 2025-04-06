@@ -91,6 +91,9 @@ func (c *Compiler) compileStructs() {
 			case "int8":
 				data += fmt.Sprintf("\td.%s = int8(bin[%d])\n", field.Name, offset)
 				offset += 1
+			case "bool":
+				data += fmt.Sprintf("\td.%s = bin[%d] != 0\n", field.Name, offset)
+				offset += 1
 			}
 		}
 		data += "}\n"

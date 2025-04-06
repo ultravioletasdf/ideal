@@ -11,7 +11,7 @@ It is intended to be used for RPC in the future
 - strings over "string_size" are cut off
 - no built in compression (empty bytes for fixed width strings take up a lot of spaces) (lz4 compresses well)
 - services are not compiled yet
-- missing implementation for important types like floats and bools
+- missing implementation for important types like floats
 - structures can't be embedded inside each other
 
 ## Examples
@@ -35,6 +35,7 @@ service Users {
 struct Crededentials {
   Username string
   Password string
+  Admin bool
 }
 struct User {
   Id string
@@ -53,12 +54,12 @@ go build .
 Encoding/decoding
 
 ```go
-creds := users.Crededentials{Username: "123456789", Password: "mypassword"}
+creds := users.Crededentials{Username: "123456789", Password: "mypassword", Admin: true}
 bytes, err := creds.Encode() // Encode creds to bytes using fixed width strings and ints
 if err != nil {
 	panic(err)
 }
-// Compress using lz4 (makes this example 128->43 bits) - DOES NOT WORK WHEN string_size IS NOT A MULTIPLE OF 8
+// Compress using lz4 (makes this example 128->43 bits) - DOES NOT WORK WHEN string_size IS LESS THAN 16
 compressed := make([]byte, len(bytes))
 sizeCompresed, err := lz4.CompressBlockHC(bytes, compressed, 0)
 if err != nil {
