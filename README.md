@@ -11,7 +11,7 @@ It is intended to be used for RPC in the future
 - strings over "string_size" are cut off
 - no built in compression (empty bytes for fixed width strings take up a lot of spaces) (lz4 compresses well)
 - services are not compiled yet
-- missing implementation for important types like floats
+- arrays/lists are not supported
 - structures can't be embedded inside each other
 
 ## Examples

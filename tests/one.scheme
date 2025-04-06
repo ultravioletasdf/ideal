@@ -13,6 +13,7 @@ struct Crededentials {
     Username string
     Password string
     Admin bool
+    Number float32
 }
 struct OtherArg {
     Username string

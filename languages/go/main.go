@@ -50,17 +50,19 @@ func (c *Compiler) compileStructs() {
 	if err != nil {
 		panic("Error converting string_size to an integer:" + err.Error())
 	}
-	_, err = fmt.Fprintf(c.file, "package %s\n\nimport \"encoding/binary\"\n\n", c.tree.Package)
+	_, err = fmt.Fprintf(c.file, "package %s\n\nimport \"encoding/binary\"\nimport \"math\"\n\nvar _ = math.E // Prevent math is unused error\n\n", c.tree.Package)
 	if err != nil {
 		panic(err)
 	}
 	for _, structure := range c.tree.Structures {
 		data := fmt.Sprintf("type %s struct {\n", structure.Name)
-		for _, field := range structure.Fields {
-			if field.Type == "int" {
-				field.Type = "int64"
+		for i := range structure.Fields {
+			if structure.Fields[i].Type == "int" {
+				structure.Fields[i].Type = "int64"
+			} else if structure.Fields[i].Type == "float" {
+				structure.Fields[i].Type = "float64"
 			}
-			data += fmt.Sprintf("\t%s %s\n", field.Name, field.Type)
+			data += fmt.Sprintf("\t%s %s\n", structure.Fields[i].Name, structure.Fields[i].Type)
 		}
 		data += fmt.Sprintf("}\nfunc (d *%s) Encode() ([]byte, error) {\n\tvar bin []byte\n\tvar err error\n", structure.Name)
 		for _, field := range structure.Fields {
@@ -91,9 +93,17 @@ func (c *Compiler) compileStructs() {
 			case "int8":
 				data += fmt.Sprintf("\td.%s = int8(bin[%d])\n", field.Name, offset)
 				offset += 1
+			case "float64":
+				data += fmt.Sprintf("\td.%s = math.Float64frombits(binary.LittleEndian.Uint64(bin[%d:%d]))\n", field.Name, offset, offset+8)
+				offset += 8
+			case "float32":
+				data += fmt.Sprintf("\td.%s = math.Float32frombits(binary.LittleEndian.Uint32(bin[%d:%d]))\n", field.Name, offset, offset+4)
+				offset += 4
 			case "bool":
 				data += fmt.Sprintf("\td.%s = bin[%d] != 0\n", field.Name, offset)
 				offset += 1
+			default:
+				panic("unrecognized type " + field.Type)
 			}
 		}
 		data += "}\n"
