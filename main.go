@@ -18,8 +18,12 @@ var compileGo = flag.Bool("go", false, "Specify whether to compile to go")
 
 func main() {
 	flag.Parse()
-
+	flag.Usage = usage
 	files := flag.Args()
+	if len(files) == 0 {
+		flag.Usage()
+		return
+	}
 	for i := range files {
 		fmt.Printf("Compiling %s...\n", files[i])
 		file, err := os.Open(files[i])
@@ -61,4 +65,8 @@ func main() {
 		}
 		fmt.Println("Done!")
 	}
+}
+func usage() {
+	fmt.Println("Usage: ideal [options] file.idl file2.idl...")
+	flag.PrintDefaults()
 }
