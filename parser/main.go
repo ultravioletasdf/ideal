@@ -5,7 +5,7 @@ import (
 	"os"
 	"unicode"
 
-	"github.com/ultravioletasdf/idl/lexer"
+	"github.com/ultravioletasdf/ideal/lexer"
 )
 
 type Nodes struct {

@@ -6,7 +6,7 @@ import (
 	"path"
 	"strconv"
 
-	"github.com/ultravioletasdf/idl/parser"
+	"github.com/ultravioletasdf/ideal/parser"
 )
 
 type Compiler struct {

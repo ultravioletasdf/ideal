@@ -1,6 +1,6 @@
-## Work in progress Interface Description Language
+## Ideal - Work in progress Interface Description Language
 
-This is a WIP library for compiling and encoding/decoding a custom IDL
+This is a WIP library for compiling and encoding/decoding my ideal IDL
 
 It is supposed to replace protobufs, by requiring less boilerplate, more go like syntax, and should be simpler to use
 
@@ -19,7 +19,7 @@ It is intended to be used for RPC in the future
 Schema
 
 ```
-# file.scheme (extension not picked yet)
+# file.idl (extension not picked yet)
 package users
 
 option go_out "customfolder/subfolder" # file will be compiled to ./customfolder/subfolder/file.idl.go
@@ -48,7 +48,7 @@ struct Session {
 Building
 ```sh
 go build .
-./idl --go file.scheme
+./ideal --go file.idl
 ```
 
 Encoding/decoding
