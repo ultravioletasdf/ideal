@@ -18,7 +18,6 @@ go install github.com/ultravioletasdf/ideal@latest
 - no built in compression (empty bytes for fixed width strings take up a lot of spaces) (lz4 compresses well)
 - services are not compiled yet
 - arrays/lists are not supported
-- structures can't be embedded inside each other
 
 ## Examples
 

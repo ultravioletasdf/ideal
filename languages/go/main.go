@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"slices"
 	"strconv"
 
 	"github.com/ultravioletasdf/ideal/parser"
@@ -50,10 +51,13 @@ func (c *Compiler) compileStructs() {
 	if err != nil {
 		panic("Error converting string_size to an integer:" + err.Error())
 	}
-	_, err = fmt.Fprintf(c.file, "package %s\n\nimport \"encoding/binary\"\nimport \"math\"\n\nvar _ = math.E // Prevent math is unused error\n\n", c.tree.Package)
+	_, err = fmt.Fprintf(c.file, "package %s\n\nimport (\n\t\"encoding/binary\" \n\t\"math\" \n\t\"bytes\"\n)\n\nvar _ = math.E // Prevent math is unused error\nvar _ = bytes.MinRead // Prevent bytes is unused error\n\n", c.tree.Package)
 	if err != nil {
 		panic(err)
 	}
+
+	var customStructs []string
+	var customStructSizes []int
 	for _, structure := range c.tree.Structures {
 		data := fmt.Sprintf("type %s struct {\n", structure.Name)
 		for i := range structure.Fields {
@@ -66,7 +70,9 @@ func (c *Compiler) compileStructs() {
 		}
 		data += fmt.Sprintf("}\nfunc (d *%s) Encode() ([]byte, error) {\n\tvar bin []byte\n\tvar err error\n", structure.Name)
 		for _, field := range structure.Fields {
-			if field.Type == "string" {
+			if slices.Contains(customStructs, field.Type) {
+				data += fmt.Sprintf("\t%s, err := d.%s.Encode()\n\tbin, err = binary.Append(bin, binary.LittleEndian, %s)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n", field.Name, field.Name, field.Name)
+			} else if field.Type == "string" {
 				data += fmt.Sprintf("\t%s := make([]byte, %d)\n\tcopy(%s[:], []byte(d.%s))\n\tbin, err = binary.Append(bin, binary.LittleEndian, %s)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n", field.Name, stringSize, field.Name, field.Name, field.Name)
 			} else {
 				data += fmt.Sprintf("\tbin, err = binary.Append(bin, binary.LittleEndian, d.%s)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n", field.Name)
@@ -79,7 +85,7 @@ func (c *Compiler) compileStructs() {
 		for _, field := range structure.Fields {
 			switch field.Type {
 			case "string":
-				data += fmt.Sprintf("\td.%s = string(bin[%d:%d])\n", field.Name, offset, offset+stringSize)
+				data += fmt.Sprintf("\td.%s = string(bytes.Trim(bin[%d:%d], \"\\x00\"))\n", field.Name, offset, offset+stringSize)
 				offset += stringSize
 			case "int64":
 				data += fmt.Sprintf("\td.%s = int64(binary.LittleEndian.Uint64(bin[%d:%d]))\n", field.Name, offset, offset+8)
@@ -103,7 +109,12 @@ func (c *Compiler) compileStructs() {
 				data += fmt.Sprintf("\td.%s = bin[%d] != 0\n", field.Name, offset)
 				offset += 1
 			default:
-				panic("unrecognized type " + field.Type)
+				if idx := slices.Index(customStructs, field.Type); idx != -1 {
+					data += fmt.Sprintf("\td.%s.Decode(bin[%d:%d])\n", field.Name, offset, offset+customStructSizes[idx])
+					offset += customStructSizes[idx]
+				} else {
+					panic("unrecognized type " + field.Type)
+				}
 			}
 		}
 		data += "}\n"
@@ -112,5 +123,7 @@ func (c *Compiler) compileStructs() {
 		if err != nil {
 			panic(err)
 		}
+		customStructs = append(customStructs, structure.Name)
+		customStructSizes = append(customStructSizes, offset)
 	}
 }

@@ -4,7 +4,7 @@ option go_out "tests_out"
 option string_size 64
 
 service User {
-    CreateUser (Crededentials, OtherArg): string
+    CreateUser (Crededentials, OtherStruct): string
     VoidFunction: nil
     MultipleResults (): (First, Second, Third)
 }
@@ -15,16 +15,16 @@ struct Crededentials {
     Admin bool
     Number float32
 }
-struct OtherArg {
-    Username string
-    Password string
+struct OtherStruct {
+    Creds Crededentials
+    ExampleValue string
 }
 struct First {
-    Info string
+    Info OtherStruct
 }
 struct Second {
-    Info string
+    Info First
 }
 struct Third {
-    Info int
+    Info Second
 }
