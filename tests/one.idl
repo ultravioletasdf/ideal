@@ -4,9 +4,9 @@ option go_out "tests_out"
 option string_size 64
 
 service User {
-    CreateUser (Crededentials, OtherStruct): string
+    CreateUser(Crededentials, OtherStruct): string
     VoidFunction: nil
-    MultipleResults (): (First, Second, Third)
+    MultipleResults(): (First, Second, Third)
 }
 
 struct Crededentials {
