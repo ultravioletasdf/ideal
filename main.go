@@ -5,8 +5,10 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path"
+	"strings"
 
-	compile_go "github.com/ultravioletasdf/ideal/languages/go"
+	language_go "github.com/ultravioletasdf/ideal/languages/go"
 	"github.com/ultravioletasdf/ideal/lexer"
 	"github.com/ultravioletasdf/ideal/parser"
 	"github.com/ultravioletasdf/ideal/validator"
@@ -60,7 +62,7 @@ func main() {
 		}
 		fmt.Println("No errors were detected")
 		if *compileGo {
-			compiler := compile_go.New("one", tree)
+			compiler := language_go.NewCompiler(strings.TrimSuffix(path.Base(file.Name()), path.Ext(file.Name())), tree)
 			compiler.Compile()
 		}
 		fmt.Println("Done!")

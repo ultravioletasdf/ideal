@@ -1,4 +1,4 @@
-package compile_go
+package language_go
 
 import (
 	"fmt"
@@ -16,7 +16,7 @@ type Compiler struct {
 	file     *os.File
 }
 
-func New(filename string, tree parser.Nodes) *Compiler {
+func NewCompiler(filename string, tree parser.Nodes) *Compiler {
 	return &Compiler{tree: tree, filename: filename}
 }
 func (c *Compiler) Close() error {
