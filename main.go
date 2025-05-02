@@ -17,12 +17,18 @@ import (
 var dtokens = flag.Bool("dtokens", false, "Specify whether to show debug information for tokenization")
 var dtree = flag.Bool("dtree", false, "Specify whether to show debug information for parsing the AST")
 var compileGo = flag.Bool("go", false, "Specify whether to compile to go")
+var version bool
 
 func main() {
+	flag.BoolVar(&version, "v", false, "Alias to -version")
+	flag.BoolVar(&version, "version", false, "Check the version")
 	flag.Parse()
 	flag.Usage = usage
+	if version {
+		fmt.Println("Version is 0.1.1")
+	}
 	files := flag.Args()
-	if len(files) == 0 {
+	if !version && len(files) == 0 {
 		flag.Usage()
 		return
 	}
