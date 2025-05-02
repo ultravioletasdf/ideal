@@ -16,7 +16,6 @@ go install github.com/ultravioletasdf/ideal@latest
 
 - strings over "string_size" are cut off
 - no built in compression (empty bytes for fixed width strings take up a lot of spaces) (lz4 compresses well)
-- services are not compiled yet
 - arrays/lists are not supported
 
 ## Examples
@@ -80,4 +79,39 @@ decoded.Decode(decompressed) // Decode decompressed bytes and sets the struct fi
 fmt.Printf("Encoded Size: %dBytes\n", len(bytes))
 fmt.Printf("Compressed Size: %dBytes\n", sizeCompresed)
 fmt.Println(decoded) // {123456789, mypassword}
+```
+
+### RPC
+
+The RPC server is implemented with http3, so you must [generate a certificate and key](https://www.digitalocean.com/community/tutorials/openssl-essentials-working-with-ssl-certificates-private-keys-and-csrs)
+
+RPC Server
+
+```go
+import (
+	language_go "github.com/ultravioletasdf/ideal/languages/go"
+	"packagename/users" // change to your out folder
+)
+server := language_go.NewServer(":3000", "./cert.pem", "./key.pem")
+server.AddService(&service.Service)
+
+userService := users.NewUserService()
+userService.Hello(func(str string) string {
+	return "hello " + str + "!"
+})
+
+server.AddService(&userService.Service)
+
+panic(server.Serve())
+```
+
+RPC Client
+```go
+client := language_go.NewClient(":3000", "./cert.pem")
+userClient := users.NewUsersClient(*client)
+hello, err := userClient.Hello("ultraviolet")
+if err != nil {
+	panic(err)
+}
+fmt.Println(hello)
 ```

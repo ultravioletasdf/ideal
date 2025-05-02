@@ -1,2 +1,5 @@
 ideal
 tests_out
+
+tests/*.pem
+tests/test.bin

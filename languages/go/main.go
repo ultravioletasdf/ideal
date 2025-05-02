@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"slices"
 	"strconv"
 
 	"github.com/ultravioletasdf/ideal/parser"
@@ -14,10 +13,22 @@ type Compiler struct {
 	tree     parser.Nodes
 	filename string
 	file     *os.File
+
+	importBinary              bool
+	importMath                bool
+	importBytes               bool
+	importServiceRequirements bool
+
+	compiledHeader   string
+	compiledStructs  string
+	compiledServices string
+	compiledClients  string
+
+	customStructs map[string]int
 }
 
 func NewCompiler(filename string, tree parser.Nodes) *Compiler {
-	return &Compiler{tree: tree, filename: filename}
+	return &Compiler{tree: tree, filename: filename, customStructs: map[string]int{}}
 }
 func (c *Compiler) Close() error {
 	return c.file.Close()
@@ -35,6 +46,10 @@ func (c *Compiler) Compile() {
 	}
 	c.file = file
 	c.compileStructs()
+	c.compileServices()
+	c.compileClients()
+	c.compileHeader()
+	c.writeFile()
 }
 func (c *Compiler) option(name, _default string) string {
 	for opt := range c.tree.Options {
@@ -44,86 +59,64 @@ func (c *Compiler) option(name, _default string) string {
 	}
 	return _default
 }
-
-func (c *Compiler) compileStructs() {
+func (c *Compiler) compileHeader() {
+	var imports []string
+	if c.importMath {
+		imports = append(imports, `"math"`)
+	}
+	if c.importBytes {
+		imports = append(imports, `"bytes"`)
+	}
+	if c.importBinary {
+		imports = append(imports, `"encoding/binary"`)
+	}
+	if c.importServiceRequirements {
+		imports = append(imports, `"io"`, `"net/http"`, `language_go "github.com/ultravioletasdf/ideal/languages/go"`)
+	}
+	c.compiledHeader = fmt.Sprintf("package %s\n\nimport (", c.tree.Package)
+	for _, imprt := range imports {
+		c.compiledHeader += "\n\t" + imprt
+	}
+	c.compiledHeader += "\n)\n\n"
+}
+func (c *Compiler) writeFile() {
+	_, err := fmt.Fprint(c.file, c.compiledHeader+c.compiledStructs+c.compiledServices+c.compiledClients)
+	if err != nil {
+		panic(err)
+	}
+}
+func (c *Compiler) calculateSize(types []string) (size int) {
 	_stringSize := c.option("string_size", "64")
 	stringSize, err := strconv.Atoi(_stringSize)
 	if err != nil {
 		panic("Error converting string_size to an integer:" + err.Error())
 	}
-	_, err = fmt.Fprintf(c.file, "package %s\n\nimport (\n\t\"encoding/binary\" \n\t\"math\" \n\t\"bytes\"\n)\n\nvar _ = math.E // Prevent math is unused error\nvar _ = bytes.MinRead // Prevent bytes is unused error\n\n", c.tree.Package)
-	if err != nil {
-		panic(err)
-	}
 
-	var customStructs []string
-	var customStructSizes []int
-	for _, structure := range c.tree.Structures {
-		data := fmt.Sprintf("type %s struct {\n", structure.Name)
-		for i := range structure.Fields {
-			if structure.Fields[i].Type == "int" {
-				structure.Fields[i].Type = "int64"
-			} else if structure.Fields[i].Type == "float" {
-				structure.Fields[i].Type = "float64"
-			}
-			data += fmt.Sprintf("\t%s %s\n", structure.Fields[i].Name, structure.Fields[i].Type)
-		}
-		data += fmt.Sprintf("}\nfunc (d *%s) Encode() ([]byte, error) {\n\tvar bin []byte\n\tvar err error\n", structure.Name)
-		for _, field := range structure.Fields {
-			if slices.Contains(customStructs, field.Type) {
-				data += fmt.Sprintf("\t%s, err := d.%s.Encode()\n\tbin, err = binary.Append(bin, binary.LittleEndian, %s)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n", field.Name, field.Name, field.Name)
-			} else if field.Type == "string" {
-				data += fmt.Sprintf("\t%s := make([]byte, %d)\n\tcopy(%s[:], []byte(d.%s))\n\tbin, err = binary.Append(bin, binary.LittleEndian, %s)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n", field.Name, stringSize, field.Name, field.Name, field.Name)
+	for i := range types {
+		switch types[i] {
+		case "string":
+			size += stringSize
+		case "int64":
+			size += 8
+		case "int32":
+			size += 4
+		case "int16":
+			size += 2
+		case "int8":
+			size += 1
+		case "float64":
+			size += 8
+		case "float32":
+			size += 4
+		case "bool":
+			size += 1
+		default:
+			if structSize, ok := c.customStructs[types[i]]; ok {
+				size += structSize
 			} else {
-				data += fmt.Sprintf("\tbin, err = binary.Append(bin, binary.LittleEndian, d.%s)\n\tif err != nil {\n\t\treturn nil, err\n\t}\n", field.Name)
+				panic("unrecognized type " + types[i])
 			}
 		}
-		data += "\treturn bin, nil\n}\n"
-
-		data += fmt.Sprintf("\nfunc (d *%s) Decode(bin []byte) {\n", structure.Name)
-		var offset int
-		for _, field := range structure.Fields {
-			switch field.Type {
-			case "string":
-				data += fmt.Sprintf("\td.%s = string(bytes.Trim(bin[%d:%d], \"\\x00\"))\n", field.Name, offset, offset+stringSize)
-				offset += stringSize
-			case "int64":
-				data += fmt.Sprintf("\td.%s = int64(binary.LittleEndian.Uint64(bin[%d:%d]))\n", field.Name, offset, offset+8)
-				offset += 8
-			case "int32":
-				data += fmt.Sprintf("\td.%s = int32(binary.LittleEndian.Uint32(bin[%d:%d]))\n", field.Name, offset, offset+4)
-				offset += 4
-			case "int16":
-				data += fmt.Sprintf("\td.%s = int16(binary.LittleEndian.Uint16(bin[%d:%d]))\n", field.Name, offset, offset+2)
-				offset += 2
-			case "int8":
-				data += fmt.Sprintf("\td.%s = int8(bin[%d])\n", field.Name, offset)
-				offset += 1
-			case "float64":
-				data += fmt.Sprintf("\td.%s = math.Float64frombits(binary.LittleEndian.Uint64(bin[%d:%d]))\n", field.Name, offset, offset+8)
-				offset += 8
-			case "float32":
-				data += fmt.Sprintf("\td.%s = math.Float32frombits(binary.LittleEndian.Uint32(bin[%d:%d]))\n", field.Name, offset, offset+4)
-				offset += 4
-			case "bool":
-				data += fmt.Sprintf("\td.%s = bin[%d] != 0\n", field.Name, offset)
-				offset += 1
-			default:
-				if idx := slices.Index(customStructs, field.Type); idx != -1 {
-					data += fmt.Sprintf("\td.%s.Decode(bin[%d:%d])\n", field.Name, offset, offset+customStructSizes[idx])
-					offset += customStructSizes[idx]
-				} else {
-					panic("unrecognized type " + field.Type)
-				}
-			}
-		}
-		data += "}\n"
-
-		_, err := fmt.Fprint(c.file, data)
-		if err != nil {
-			panic(err)
-		}
-		customStructs = append(customStructs, structure.Name)
-		customStructSizes = append(customStructSizes, offset)
 	}
+	return
 }

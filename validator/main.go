@@ -8,7 +8,7 @@ import (
 	"github.com/ultravioletasdf/ideal/parser"
 )
 
-var known = []string{"string", "nil", "int", "int8", "int16", "int32", "int64", "float", "float64", "float32", "bool"}
+var known = []string{"string", "int", "int8", "int16", "int32", "int64", "float", "float64", "float32", "bool"}
 
 type Validator struct {
 	tree         parser.Nodes

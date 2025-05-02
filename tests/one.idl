@@ -1,11 +1,12 @@
 package users
 
 option go_out "tests_out"
-option string_size 64
+option string_size 32
 
 service User {
-    CreateUser(Crededentials, OtherStruct): string
-    VoidFunction: nil
+    Hello(string): string
+    CreateUser(Crededentials): string
+    VoidFunction: ()
     MultipleResults(): (First, Second, Third)
 }
 
