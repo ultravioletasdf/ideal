@@ -34,14 +34,14 @@ func (c *Compiler) compileServices() {
 			c.compiledServices += fmt.Sprintf("\ts.Mux.HandleFunc(\"/%s/%s\", func(w http.ResponseWriter, r *http.Request) {", service.Name, function.Name)
 
 			c.compiledServices += fmt.Sprintf(`
-	body := make([]byte, %d)
-	var err error
+		body := make([]byte, %d)
+		var err error
 
-	_, err = io.ReadFull(r.Body, body)
-	if err != nil {
-		s.ErrorHandler(err)
-		w.WriteHeader(500)
-		return
+		_, err = io.ReadFull(r.Body, body)
+		if err != nil {
+			s.ErrorHandler(err)
+			w.WriteHeader(500)
+			return
 		}`, c.calculateSize(function.Inputs))
 
 			var offset int
@@ -96,20 +96,20 @@ func (c *Compiler) compileServices() {
 				temp := make([]string, len(function.Outputs))
 				copy(temp, function.Outputs)
 				for i := range function.Outputs {
-					temp[i] = fmt.Sprintf("out_%s", function.Outputs[i])
+					temp[i] = fmt.Sprintf("out_%s_%d", function.Outputs[i], i)
 				}
 				c.compiledServices += fmt.Sprintf("%s := ", strings.Join(temp, ", "))
 			}
 			c.compiledServices += "f(" + strings.Join(inputs, ", ") + ")\n"
 
-			for _, output := range function.Outputs {
+			for i, output := range function.Outputs {
 				c.importBinary = true
 				if _, ok := c.customStructs[output]; ok {
-					c.compiledServices += fmt.Sprintf("\n\t\tout_%s_bytes, err := out_%s.Encode()\n\t\terr = binary.Write(w, binary.LittleEndian, out_%s_bytes)\n\t\tif err != nil {\n\t\t\treturn\n\t\t}\n", output, output, output)
+					c.compiledServices += fmt.Sprintf("\n\t\tout_%s_%d_bytes, err := out_%s_%d.Encode()\n\t\terr = binary.Write(w, binary.LittleEndian, out_%s_%d_bytes)\n\t\tif err != nil {\n\t\t\treturn\n\t\t}\n", output, i, output, i, output, i)
 				} else if output == "string" {
-					c.compiledServices += fmt.Sprintf("\n\t\tout_%s_bytes := make([]byte, %d)\n\t\tcopy(out_%s_bytes[:], []byte(out_%s))\n\t\terr = binary.Write(w, binary.LittleEndian, out_%s_bytes)\n\t\tif err != nil {\n\t\t\treturn\n\t\t}\n", output, stringSize, output, output, output)
+					c.compiledServices += fmt.Sprintf("\n\t\tout_%s_%d_bytes := make([]byte, %d)\n\t\tcopy(out_%s_%d_bytes[:], []byte(out_%s_%d))\n\t\terr = binary.Write(w, binary.LittleEndian, out_%s_%d_bytes)\n\t\tif err != nil {\n\t\t\treturn\n\t\t}\n", output, i, stringSize, output, i, output, i, output, i)
 				} else {
-					c.compiledServices += fmt.Sprintf("\n\t\terr = binary.Write(w, binary.LittleEndian, out_%s)\n\t\tif err != nil {\n\t\t\treturn\n\t\t}\n", output)
+					c.compiledServices += fmt.Sprintf("\n\t\terr = binary.Write(w, binary.LittleEndian, out_%s_%d)\n\t\tif err != nil {\n\t\t\treturn\n\t\t}\n", output, i)
 				}
 			}
 			c.compiledServices += "\t})\n}\n\n"
