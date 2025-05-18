@@ -139,7 +139,7 @@ func (c *Compiler) compileClients() {
 					offset += 1
 				default:
 					if size, ok := c.customStructs[output]; ok {
-						c.compiledClients += fmt.Sprintf("\n\tout%d.Decode(res[%d:%d])", i, offset, offset+size)
+						c.compiledClients += fmt.Sprintf("\n\tout%d.Decode(res[%d:%d])\n", i, offset, offset+size)
 						offset += size
 					} else {
 						panic("unrecognized type " + output)
