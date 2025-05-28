@@ -32,9 +32,14 @@ func main() {
 	service.Hello(func(str string) string {
 		return "hello " + str + "!"
 	})
-	// http3.ListenAndServeQUIC(":3000", "./cert.pem", "./key.pem", &service.Mux)
+
+	secondService := users.NewSecondService()
+	secondService.Hello(func() {
+		fmt.Println("Recieved hello on secondservice")
+	})
 	server := language_go.NewServer(":3000", "./cert.pem", "./key.pem")
 	server.AddService(&service.Service)
+	server.AddService(&secondService.Service)
 
 	go func() {
 		fmt.Println("Starting RPC server...")

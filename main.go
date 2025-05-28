@@ -25,7 +25,7 @@ func main() {
 	flag.Parse()
 	flag.Usage = usage
 	if version {
-		fmt.Println("Version is 0.1.4")
+		fmt.Println("Version is 0.1.5")
 	}
 	files := flag.Args()
 	if !version && len(files) == 0 {

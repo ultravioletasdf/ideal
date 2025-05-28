@@ -1,0 +1,8 @@
+package users
+
+option go_out "tests_out"
+option string_size 32
+
+service Second {
+    Hello(): ()
+}

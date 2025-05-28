@@ -9,7 +9,8 @@ import (
 
 type Service struct {
 	// DO NOT USE
-	Mux http.ServeMux
+	Mux  http.ServeMux
+	Name string
 }
 
 // Function that is called when there is an error parsing a body, by default just prints the error
@@ -26,12 +27,12 @@ func (c *Compiler) compileServices() {
 	for _, service := range c.tree.Services {
 		c.importServiceRequirements = true
 		c.compiledServices += fmt.Sprintf("type %sService struct {\n\tlanguage_go.Service\n}\n", service.Name)
-		c.compiledServices += fmt.Sprintf("func New%sService() *%sService {\n\treturn &%sService{}\n}\n", service.Name, service.Name, service.Name)
+		c.compiledServices += fmt.Sprintf("func New%sService() *%sService {\n\treturn &%sService{Service: language_go.Service{Name: \"%s\"}}\n}\n", service.Name, service.Name, service.Name, service.Name)
 		for _, function := range service.Functions {
 			c.compiledServices += fmt.Sprintf("func (s *%sService) %s(f func(", service.Name, function.Name)
 			c.compiledServices += strings.Join(function.Inputs, ", ")
 			c.compiledServices += ") (" + strings.Join(function.Outputs, ", ") + ")) {\n"
-			c.compiledServices += fmt.Sprintf("\ts.Mux.HandleFunc(\"/%s/%s\", func(w http.ResponseWriter, r *http.Request) {", service.Name, function.Name)
+			c.compiledServices += fmt.Sprintf("\ts.Mux.HandleFunc(\"/%s\", func(w http.ResponseWriter, r *http.Request) {", function.Name)
 
 			c.compiledServices += fmt.Sprintf(`
 		body := make([]byte, %d)

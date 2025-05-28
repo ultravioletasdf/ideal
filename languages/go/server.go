@@ -1,6 +1,7 @@
 package language_go
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/quic-go/quic-go/http3"
@@ -18,7 +19,8 @@ func NewServer(addr, certFile, keyFile string) *Server {
 }
 
 func (s *Server) AddService(service *Service) error {
-	s.mux.Handle("/", &service.Mux)
+	fmt.Println("Handling /" + service.Name)
+	s.mux.Handle("/"+service.Name+"/", http.StripPrefix("/"+service.Name, &service.Mux))
 	return nil
 }
 func (s *Server) Serve() error {
