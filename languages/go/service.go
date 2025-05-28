@@ -102,14 +102,15 @@ func (c *Compiler) compileServices() {
 			}
 			c.compiledServices += "f(" + strings.Join(inputs, ", ") + ")\n"
 
+			handleError := "\n\t\tif err != nil {\n\t\t\ts.ErrorHandler(err)\n\t\t\tw.WriteHeader(500)\n\t\t\treturn\n\t\t}\n"
 			for i, output := range function.Outputs {
 				c.importBinary = true
 				if _, ok := c.customStructs[output]; ok {
-					c.compiledServices += fmt.Sprintf("\n\t\tout_%s_%d_bytes, err := out_%s_%d.Encode()\n\t\terr = binary.Write(w, binary.LittleEndian, out_%s_%d_bytes)\n\t\tif err != nil {\n\t\t\treturn\n\t\t}\n", output, i, output, i, output, i)
+					c.compiledServices += fmt.Sprintf("\n\t\tout_%s_%d_bytes, err := out_%s_%d.Encode()%s\n\t\terr = binary.Write(w, binary.LittleEndian, out_%s_%d_bytes)%s", output, i, output, i, handleError, output, i, handleError)
 				} else if output == "string" {
-					c.compiledServices += fmt.Sprintf("\n\t\tout_%s_%d_bytes := make([]byte, %d)\n\t\tcopy(out_%s_%d_bytes[:], []byte(out_%s_%d))\n\t\terr = binary.Write(w, binary.LittleEndian, out_%s_%d_bytes)\n\t\tif err != nil {\n\t\t\treturn\n\t\t}\n", output, i, stringSize, output, i, output, i, output, i)
+					c.compiledServices += fmt.Sprintf("\n\t\tout_%s_%d_bytes := make([]byte, %d)\n\t\tcopy(out_%s_%d_bytes[:], []byte(out_%s_%d))\n\t\terr = binary.Write(w, binary.LittleEndian, out_%s_%d_bytes)%s", output, i, stringSize, output, i, output, i, output, i, handleError)
 				} else {
-					c.compiledServices += fmt.Sprintf("\n\t\terr = binary.Write(w, binary.LittleEndian, out_%s_%d)\n\t\tif err != nil {\n\t\t\treturn\n\t\t}\n", output, i)
+					c.compiledServices += fmt.Sprintf("\n\t\terr = binary.Write(w, binary.LittleEndian, out_%s_%d)%s", output, i, handleError)
 				}
 			}
 			c.compiledServices += "\t})\n}\n\n"
