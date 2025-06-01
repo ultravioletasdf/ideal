@@ -3,6 +3,7 @@ package parser
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"unicode"
 
 	"github.com/ultravioletasdf/ideal/lexer"
@@ -24,8 +25,12 @@ type ServiceNode struct {
 }
 type FunctionNode struct {
 	Name    string
-	Inputs  []string
-	Outputs []string
+	Inputs  []Type
+	Outputs []Type
+}
+type Type struct {
+	Type string
+	Size int
 }
 type StructureNode struct {
 	Name   string
@@ -34,6 +39,7 @@ type StructureNode struct {
 type FieldNode struct {
 	Name string
 	Type string
+	Size int
 }
 type Parser struct {
 	tokens []lexer.Token
@@ -118,23 +124,46 @@ func (p *Parser) parseFunction() FunctionNode {
 	if nextToken.Type != lexer.LeftBracket && nextToken.Type != lexer.Colon {
 		unexpected(nextToken, "( or :", nextToken.Value)
 	}
-	var inputs []string
+	var inputs []Type
 	if nextToken.Type == lexer.LeftBracket {
 		inputs = p.parseList()
 		p.next() // consume :
 	}
 	result := p.next()
-	var outputs []string
+	var outputs []Type
 	if result.Type == lexer.LeftBracket {
 		outputs = p.parseList()
+	} else if result.Type == lexer.LeftSquareBracket {
+		size := p.next()
+		rightBracket := p.next()
+		typeName := p.next()
+		if size.Type != lexer.Identifier {
+			unexpected(size, "an identifier", size.Value)
+		}
+		if typeName.Type != lexer.Identifier {
+			unexpected(typeName, "an identifier", typeName.Value)
+		}
+		sizeInt, err := strconv.Atoi(size.Value)
+		if err != nil {
+			fmt.Printf("%d:%d Couldn't parse identifier as an integer: %v\n", size.Pos.Line, size.Pos.Column, err)
+			os.Exit(1)
+		}
+		if sizeInt < 1 {
+			fmt.Printf("%d:%d Arrays must be at least 1 in size, got %d\n", size.Pos.Line, size.Pos.Column, sizeInt)
+			os.Exit(1)
+		}
+		if rightBracket.Type != lexer.RightSquareBracket {
+			unexpected(rightBracket, "]", rightBracket.Value)
+		}
+		outputs = append(outputs, Type{Type: typeName.Value, Size: sizeInt})
 	} else if result.Type != lexer.Identifier {
 		unexpected(result, "identifier", result.Value)
 	} else {
-		outputs = []string{result.Value}
+		outputs = []Type{{Type: result.Value}}
 	}
 	return FunctionNode{Name: name, Inputs: inputs, Outputs: outputs}
 }
-func (p *Parser) parseList() (list []string) {
+func (p *Parser) parseList() (list []Type) {
 	expectsComma := false
 	for p.peek().Type != lexer.RightBracket {
 		token := p.next()
@@ -147,13 +176,37 @@ func (p *Parser) parseList() (list []string) {
 				expectsComma = false
 				continue
 			} else {
-				unexpected(token, ",", token.Value)
 				fmt.Println("Expected Comma")
+				unexpected(token, ",", token.Value)
 				os.Exit(1)
 			}
 		}
-		if token.Type == lexer.Identifier {
-			list = append(list, token.Value)
+		if token.Type == lexer.LeftSquareBracket {
+			size := p.next()
+			rightBracket := p.next()
+			typeName := p.next()
+			if size.Type != lexer.Identifier {
+				unexpected(size, "an identifier", size.Value)
+			}
+			if typeName.Type != lexer.Identifier {
+				unexpected(typeName, "an identifier", typeName.Value)
+			}
+			sizeInt, err := strconv.Atoi(size.Value)
+			if err != nil {
+				fmt.Printf("%d:%d Couldn't parse identifier as an integer: %v\n", size.Pos.Line, size.Pos.Column, err)
+				os.Exit(1)
+			}
+			if sizeInt < 1 {
+				fmt.Printf("%d:%d Arrays must be at least 1 in size, got %d\n", size.Pos.Line, size.Pos.Column, sizeInt)
+				os.Exit(1)
+			}
+			if rightBracket.Type != lexer.RightSquareBracket {
+				unexpected(rightBracket, "]", rightBracket.Value)
+			}
+			list = append(list, Type{Type: typeName.Value, Size: sizeInt})
+			expectsComma = true
+		} else if token.Type == lexer.Identifier {
+			list = append(list, Type{Type: token.Value})
 			expectsComma = true
 		} else {
 			unexpected(token, "identifier", token.Value)
@@ -177,11 +230,37 @@ func (p *Parser) parseStruct() StructureNode {
 			fmt.Printf("%d:%d Must follow format: FieldName type\n", one.Pos.Line, one.Pos.Column)
 			os.Exit(1)
 		}
-		if one.Type != lexer.Identifier || two.Type != lexer.Identifier {
+		if one.Type != lexer.Identifier {
+			unexpected(one, "identifier", one.Value)
+		} else if two.Type == lexer.LeftSquareBracket {
+			size := p.next()
+			rightBracket := p.next()
+			typeName := p.next()
+			if size.Type != lexer.Identifier {
+				unexpected(size, "an identifier", size.Value)
+			}
+			if typeName.Type != lexer.Identifier {
+				unexpected(typeName, "an identifier", typeName.Value)
+			}
+			sizeInt, err := strconv.Atoi(size.Value)
+			if err != nil {
+				fmt.Printf("%d:%d Couldn't parse identifier as an integer: %v\n", size.Pos.Line, size.Pos.Column, err)
+				os.Exit(1)
+			}
+			if sizeInt < 1 {
+				fmt.Printf("%d:%d Arrays must be at least 1 in size, got %d\n", size.Pos.Line, size.Pos.Column, sizeInt)
+				os.Exit(1)
+			}
+			if rightBracket.Type != lexer.RightSquareBracket {
+				unexpected(rightBracket, "]", rightBracket.Value)
+			}
+			fields = append(fields, FieldNode{Name: one.Value, Type: typeName.Value, Size: sizeInt})
+		} else if one.Type != lexer.Identifier || two.Type != lexer.Identifier {
 			fmt.Printf("%d:%d Expected two identifiers, got %v and %v\n", one.Pos.Line, one.Pos.Column, one.Value, two.Value)
 			os.Exit(1)
+		} else {
+			fields = append(fields, FieldNode{Name: one.Value, Type: two.Value})
 		}
-		fields = append(fields, FieldNode{Name: one.Value, Type: two.Value})
 	}
 	p.next()
 	return StructureNode{Name: name, Fields: fields}

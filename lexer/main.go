@@ -11,18 +11,20 @@ import (
 type Type int
 
 const (
-	Service      Type = iota // service
-	Package                  // package
-	Option                   // option
-	Structure                // struct
-	LeftBrace                // {
-	RightBrace               // }
-	LeftBracket              // (
-	RightBracket             // )
-	EndOfFile                // EOF
-	Colon                    // :
-	Comma                    // ,
-	Quote                    // "
+	Service            Type = iota // service
+	Package                        // package
+	Option                         // option
+	Structure                      // struct
+	LeftBrace                      // {
+	RightBrace                     // }
+	LeftBracket                    // (
+	RightBracket                   // )
+	EndOfFile                      // EOF
+	Colon                          // :
+	Comma                          // ,
+	Quote                          // "
+	LeftSquareBracket              // [
+	RightSquareBracket             // ]
 	Identifier
 	Illegal // Unrecognized character
 )
@@ -76,6 +78,10 @@ func (l *Lexer) Lex() Token {
 			return Token{Type: Colon, Pos: l.pos, Value: ":"}
 		case ',':
 			return Token{Type: Comma, Pos: l.pos, Value: ","}
+		case '[':
+			return Token{Type: LeftSquareBracket, Pos: l.pos, Value: "["}
+		case ']':
+			return Token{Type: RightSquareBracket, Pos: l.pos, Value: "]"}
 		case '"':
 			l.unterminatedQuote = !l.unterminatedQuote
 			return Token{Type: Quote, Pos: l.pos, Value: "\""}

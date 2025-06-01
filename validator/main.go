@@ -44,13 +44,13 @@ func (v *Validator) validateServices() error {
 	for _, service := range v.tree.Services {
 		for _, function := range service.Functions {
 			for _, input := range function.Inputs {
-				if !v.hasStruct(input) {
-					return errors.New(fmt.Sprintf("Unknown structure %s", input))
+				if !v.hasStruct(input.Type) {
+					return errors.New(fmt.Sprintf("Unknown structure %s", input.Type))
 				}
 			}
 			for _, output := range function.Outputs {
-				if !v.hasStruct(output) {
-					return errors.New(fmt.Sprintf("Unknown structure %s", output))
+				if !v.hasStruct(output.Type) {
+					return errors.New(fmt.Sprintf("Unknown structure %s", output.Type))
 				}
 			}
 		}

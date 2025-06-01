@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/quic-go/quic-go/http3"
+	"github.com/ultravioletasdf/ideal/parser"
 )
 
 type Client struct {
@@ -69,13 +70,21 @@ func (c *Compiler) compileClients() {
 			c.compiledClients += fmt.Sprintf("func (c *%sClient) %s(", service.Name, function.Name)
 			inputs := make([]string, len(function.Inputs))
 			for i := range function.Inputs {
-				inputs[i] = fmt.Sprintf("%s%d %s", function.Inputs[i], i, function.Inputs[i])
+				if function.Inputs[i].Size > 0 {
+					inputs[i] = fmt.Sprintf("%s_%d [%d]%s", function.Inputs[i].Type, i, function.Inputs[i].Size, function.Inputs[i].Type)
+				} else {
+					inputs[i] = fmt.Sprintf("%s_%d %s", function.Inputs[i].Type, i, function.Inputs[i].Type)
+				}
 			}
 			c.compiledClients += strings.Join(inputs, ", ")
 
 			outputs := make([]string, len(function.Outputs))
 			for i := range function.Outputs {
-				outputs[i] = fmt.Sprintf("out%d %s", i, function.Outputs[i])
+				if function.Outputs[i].Size > 0 {
+					outputs[i] = fmt.Sprintf("out_%d [%d]%s", i, function.Outputs[i].Size, function.Outputs[i].Type)
+				} else {
+					outputs[i] = fmt.Sprintf("out_%d %s", i, function.Outputs[i].Type)
+				}
 			}
 			outputs = append(outputs, "_err error")
 
@@ -85,21 +94,42 @@ func (c *Compiler) compileClients() {
 
 			var offset int
 			for i, input := range function.Inputs {
-				if input == "nil" {
+				if input.Type == "nil" {
 					break
 				}
 
-				if size, ok := c.customStructs[input]; ok {
-					c.compiledClients += fmt.Sprintf("\n\t%s_bytes, err := %s%d.Encode()\n\tif err != nil {\n\t\t_err = err\n\t\treturn\n\t}\n\tcopy(body[%d:%d], %s_bytes)", input, input, i, offset, offset+size, input)
-					offset += size
-				} else if input == "string" {
-					c.compiledClients += fmt.Sprintf("\n\tcopy(body[%d:%d], []byte(%s%d))", offset, offset+stringSize, input, i)
-					offset += stringSize
+				if input.Size > 0 {
+					if size, ok := c.customStructs[input.Type]; ok {
+						for j := range input.Size {
+							c.compiledClients += fmt.Sprintf("\n\t%s_%d_%d_bytes, err := %s_%d[%d].Encode()\n\tif err != nil {\n\t\t_err = err\n\t\treturn\n\t}\n\tcopy(body[%d:%d], %s_%d_%d_bytes)", input.Type, i, j, input.Type, i, j, offset, offset+size, input.Type, i, j)
+							offset += size
+						}
+					} else if input.Type == "string" {
+						for j := range input.Size {
+							c.compiledClients += fmt.Sprintf("\n\tcopy(body[%d:%d], []byte(%s_%d[%d]))", offset, offset+stringSize, input.Type, i, j)
+							offset += stringSize
+						}
+					} else {
+						size := c.calculateSize([]parser.Type{{Type: input.Type}})
+						for j := range input.Size {
+							c.compiledClients += fmt.Sprintf("\n\tvar %s_%d_%d_bytes bytes.Buffer\n\t_err = binary.Write(&%s_%d_%d_bytes, binary.LittleEndian, %s_%d[%d])\n\tif _err != nil {\n\t\t\treturn\n\t\t}\n\tcopy(body[%d:%d], %s_%d_%d_bytes.Bytes())", input.Type, i, j, input.Type, i, j, input.Type, i, j, offset, offset+size, input.Type, i, j)
+							offset += size
+						}
+					}
 				} else {
-					size := c.calculateSize([]string{input})
-					c.compiledClients += fmt.Sprintf("\n\tvar %s_bytes bytes.Buffer\n\t_err = binary.Write(&buf, binary.LittleEndian, %s%d)\n\tif _err != nil {\n\t\t\treturn\n\t\t}\n\tbody[%d:%d] = %s_bytes", input, input, i, offset, offset+size, input)
-					offset += size
+					if size, ok := c.customStructs[input.Type]; ok {
+						c.compiledClients += fmt.Sprintf("\n\t%s_%d_bytes, err := %s_%d.Encode()\n\tif err != nil {\n\t\t_err = err\n\t\treturn\n\t}\n\tcopy(body[%d:%d], %s_%d_bytes)", input.Type, i, input.Type, i, offset, offset+size, input.Type, i)
+						offset += size
+					} else if input.Type == "string" {
+						c.compiledClients += fmt.Sprintf("\n\tcopy(body[%d:%d], []byte(%s_%d))", offset, offset+stringSize, input.Type, i)
+						offset += stringSize
+					} else {
+						size := c.calculateSize([]parser.Type{input})
+						c.compiledClients += fmt.Sprintf("\n\tvar %s_%d_bytes bytes.Buffer\n\t_err = binary.Write(&%s_%d_bytes, binary.LittleEndian, %s_%d)\n\tif _err != nil {\n\t\t\treturn\n\t\t}\n\tcopy(body[%d:%d], %s_%d_bytes.Bytes())", input.Type, i, input.Type, i, input.Type, i, offset, offset+size, input.Type, i)
+						offset += size
+					}
 				}
+
 			}
 			name := "res"
 			if len(function.Outputs) == 0 {
@@ -109,40 +139,97 @@ func (c *Compiler) compileClients() {
 
 			offset = 0
 			for i, output := range function.Outputs {
-				switch output {
-				case "string":
-					c.importBytes = true
-					c.compiledClients += fmt.Sprintf("\tout%d = string(bytes.Trim(res[%d:%d], \"\\x00\"))\n", i, offset, offset+stringSize)
-					offset += stringSize
-				case "int64":
-					c.compiledClients += fmt.Sprintf("\tout%d = int64(binary.LittleEndian.Uint64(res[%d:%d]))\n", i, offset, offset+8)
-					offset += 8
-				case "int32":
-					c.compiledClients += fmt.Sprintf("\tout%d = int32(binary.LittleEndian.Uint32(res[%d:%d]))\n", i, offset, offset+4)
-					offset += 4
-				case "int16":
-					c.compiledClients += fmt.Sprintf("\tout%d = int16(binary.LittleEndian.Uint16(res[%d:%d]))\n", i, offset, offset+2)
-					offset += 2
-				case "int8":
-					c.compiledClients += fmt.Sprintf("\tout%d = int8(res[%d])\n", i, offset)
-					offset += 1
-				case "float64":
-					c.importMath = true
-					c.compiledClients += fmt.Sprintf("\tout%d = math.Float64frombits(binary.LittleEndian.Uint64(res[%d:%d]))\n", i, offset, offset+8)
-					offset += 8
-				case "float32":
-					c.importMath = true
-					c.compiledClients += fmt.Sprintf("\tout%d = math.Float32frombits(binary.LittleEndian.Uint32(res[%d:%d]))\n", i, offset, offset+4)
-					offset += 4
-				case "bool":
-					c.compiledClients += fmt.Sprintf("\tout%d = res[%d] != 0\n", i, offset)
-					offset += 1
-				default:
-					if size, ok := c.customStructs[output]; ok {
-						c.compiledClients += fmt.Sprintf("\n\tout%d.Decode(res[%d:%d])\n", i, offset, offset+size)
-						offset += size
-					} else {
-						panic("unrecognized type " + output)
+				if output.Size > 0 {
+					switch output.Type {
+					case "string":
+						c.importBytes = true
+						for j := range output.Size {
+							c.compiledClients += fmt.Sprintf("\tout_%d[%d] = string(bytes.Trim(res[%d:%d], \"\\x00\"))\n", i, j, offset, offset+stringSize)
+							offset += stringSize
+						}
+					case "int64":
+						for j := range output.Size {
+							c.compiledClients += fmt.Sprintf("\tout_%d[%d] = int64(binary.LittleEndian.Uint64(res[%d:%d]))\n", i, j, offset, offset+8)
+							offset += 8
+						}
+					case "int32":
+						for j := range output.Size {
+							c.compiledClients += fmt.Sprintf("\tout_%d[%d] = int32(binary.LittleEndian.Uint32(res[%d:%d]))\n", i, j, offset, offset+4)
+							offset += 4
+						}
+					case "int16":
+						for j := range output.Size {
+							c.compiledClients += fmt.Sprintf("\tout_%d[%d] = int16(binary.LittleEndian.Uint16(res[%d:%d]))\n", i, j, offset, offset+2)
+							offset += 2
+						}
+					case "int8":
+						for j := range output.Size {
+							c.compiledClients += fmt.Sprintf("\tout_%d[%d] = int8(res[%d])\n", i, j, offset)
+							offset += 1
+						}
+					case "float64":
+						c.importMath = true
+						for j := range output.Size {
+							c.compiledClients += fmt.Sprintf("\tout_%d[%d] = math.Float64frombits(binary.LittleEndian.Uint64(res[%d:%d]))\n", i, j, offset, offset+8)
+							offset += 8
+						}
+					case "float32":
+						c.importMath = true
+						for j := range output.Size {
+							c.compiledClients += fmt.Sprintf("\tout_%d[%d] = math.Float32frombits(binary.LittleEndian.Uint32(res[%d:%d]))\n", i, j, offset, offset+4)
+							offset += 4
+						}
+					case "bool":
+						for j := range output.Size {
+							c.compiledClients += fmt.Sprintf("\tout_%d[%d] = res[%d] != 0\n", i, j, offset)
+							offset += 1
+						}
+					default:
+						if size, ok := c.customStructs[output.Type]; ok {
+							for j := range output.Size {
+								c.compiledClients += fmt.Sprintf("\n\tout_%d[%d].Decode(res[%d:%d])\n", i, j, offset, offset+size)
+								offset += size
+							}
+						} else {
+							panic("unrecognized type " + output.Type)
+						}
+					}
+				} else {
+					switch output.Type {
+					case "string":
+						c.importBytes = true
+						c.compiledClients += fmt.Sprintf("\tout_%d = string(bytes.Trim(res[%d:%d], \"\\x00\"))\n", i, offset, offset+stringSize)
+						offset += stringSize
+					case "int64":
+						c.compiledClients += fmt.Sprintf("\tout_%d = int64(binary.LittleEndian.Uint64(res[%d:%d]))\n", i, offset, offset+8)
+						offset += 8
+					case "int32":
+						c.compiledClients += fmt.Sprintf("\tout_%d = int32(binary.LittleEndian.Uint32(res[%d:%d]))\n", i, offset, offset+4)
+						offset += 4
+					case "int16":
+						c.compiledClients += fmt.Sprintf("\tout_%d = int16(binary.LittleEndian.Uint16(res[%d:%d]))\n", i, offset, offset+2)
+						offset += 2
+					case "int8":
+						c.compiledClients += fmt.Sprintf("\tout_%d = int8(res[%d])\n", i, offset)
+						offset += 1
+					case "float64":
+						c.importMath = true
+						c.compiledClients += fmt.Sprintf("\tout_%d = math.Float64frombits(binary.LittleEndian.Uint64(res[%d:%d]))\n", i, offset, offset+8)
+						offset += 8
+					case "float32":
+						c.importMath = true
+						c.compiledClients += fmt.Sprintf("\tout_%d = math.Float32frombits(binary.LittleEndian.Uint32(res[%d:%d]))\n", i, offset, offset+4)
+						offset += 4
+					case "bool":
+						c.compiledClients += fmt.Sprintf("\tout_%d = res[%d] != 0\n", i, offset)
+						offset += 1
+					default:
+						if size, ok := c.customStructs[output.Type]; ok {
+							c.compiledClients += fmt.Sprintf("\n\tout_%d.Decode(res[%d:%d])\n", i, offset, offset+size)
+							offset += size
+						} else {
+							panic("unrecognized type " + output.Type)
+						}
 					}
 				}
 			}

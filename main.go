@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io/fs"
 	"os"
 	"path"
+	"path/filepath"
+	"slices"
 	"strings"
 
 	language_go "github.com/ultravioletasdf/ideal/languages/go"
@@ -31,6 +34,11 @@ func main() {
 	if !version && len(files) == 0 {
 		flag.Usage()
 		return
+	}
+	whitelist := make([]string, len(files))
+	copy(whitelist, files)
+	for i := range files {
+		whitelist[i] = filepath.Base(whitelist[i] + ".go")
 	}
 	for i := range files {
 		fmt.Printf("Compiling %s...\n", files[i])
@@ -69,7 +77,8 @@ func main() {
 		fmt.Println("No errors were detected")
 		if *compileGo {
 			compiler := language_go.NewCompiler(strings.TrimSuffix(path.Base(file.Name()), path.Ext(file.Name())), tree)
-			compiler.Compile()
+			out := compiler.Compile()
+			cleanup(whitelist, out)
 		}
 		fmt.Println("Done!")
 	}
@@ -77,4 +86,23 @@ func main() {
 func usage() {
 	fmt.Println("Usage: ideal [options] file.idl file2.idl...")
 	flag.PrintDefaults()
+}
+
+// cleanup removes all *.idl.go files in the output directory
+func cleanup(whitelist []string, out string) {
+	err := filepath.Walk(out, func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() && strings.HasSuffix(path, ".idl.go") && !slices.Contains(whitelist, filepath.Base(path)) {
+			err := os.Remove(path)
+			if err != nil {
+				fmt.Printf("Failed to cleanup %s: %v", path, err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		fmt.Printf("Failed to cleanup: %v", err.Error())
+	}
 }

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 
 	"github.com/ultravioletasdf/ideal/parser"
 )
@@ -33,7 +34,7 @@ func NewCompiler(filename string, tree parser.Nodes) *Compiler {
 func (c *Compiler) Close() error {
 	return c.file.Close()
 }
-func (c *Compiler) Compile() {
+func (c *Compiler) Compile() string {
 	fmt.Println("Compiling for go...")
 	out := c.option("go_out", c.tree.Package)
 	err := os.MkdirAll(out, os.ModePerm)
@@ -50,7 +51,10 @@ func (c *Compiler) Compile() {
 	c.compileClients()
 	c.compileHeader()
 	c.writeFile()
+	return out
 }
+
+// option gets a package option, returning _default if it is not found
 func (c *Compiler) option(name, _default string) string {
 	for opt := range c.tree.Options {
 		if c.tree.Options[opt].Name == name {
@@ -85,7 +89,7 @@ func (c *Compiler) writeFile() {
 		panic(err)
 	}
 }
-func (c *Compiler) calculateSize(types []string) (size int) {
+func (c *Compiler) calculateSize(types []parser.Type) (size int) {
 	_stringSize := c.option("string_size", "64")
 	stringSize, err := strconv.Atoi(_stringSize)
 	if err != nil {
@@ -93,30 +97,36 @@ func (c *Compiler) calculateSize(types []string) (size int) {
 	}
 
 	for i := range types {
-		switch types[i] {
+		types[i].Type = strings.TrimPrefix(types[i].Type, fmt.Sprintf("[%d]", types[i].Size))
+		var typeSize int
+		switch types[i].Type {
 		case "string":
-			size += stringSize
+			typeSize = stringSize
 		case "int64":
-			size += 8
+			typeSize = 8
 		case "int32":
-			size += 4
+			typeSize = 4
 		case "int16":
-			size += 2
+			typeSize = 2
 		case "int8":
-			size += 1
+			typeSize = 1
 		case "float64":
-			size += 8
+			typeSize = 8
 		case "float32":
-			size += 4
+			typeSize = 4
 		case "bool":
-			size += 1
+			typeSize = 1
 		default:
-			if structSize, ok := c.customStructs[types[i]]; ok {
-				size += structSize
+			if structSize, ok := c.customStructs[types[i].Type]; ok {
+				typeSize = structSize
 			} else {
-				panic("unrecognized type " + types[i])
+				panic("unrecognized type " + types[i].Type)
 			}
 		}
+		if types[i].Size > 0 {
+			typeSize *= types[i].Size
+		}
+		size += typeSize
 	}
 	return
 }

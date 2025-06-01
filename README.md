@@ -16,7 +16,6 @@ go install github.com/ultravioletasdf/ideal@latest
 
 - strings over "string_size" are cut off
 - no built in compression (empty bytes for fixed width strings take up a lot of spaces) (lz4 compresses well)
-- arrays/lists are not supported
 
 ## Examples
 
@@ -46,6 +45,13 @@ struct User {
 }
 struct Session {
   Token string
+}
+# Fixed length arrays are supported
+struct MyStructWithArray {
+  MyArray [5]string
+}
+service MyServiceWithArray {
+  Sum([3]int): int
 }
 ```
 
