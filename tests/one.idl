@@ -3,7 +3,7 @@ package tests
 option go_out "tests_out"
 
 service User {
-    Hello([3]string): [3]string
+    Hello([]string, error): ([]string, error)
     CreateUser(Crededentials): (string, error)
     VoidFunction: ()
     MultipleResults(): (First, Second, Third)

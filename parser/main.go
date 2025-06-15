@@ -190,6 +190,7 @@ func (p *Parser) parseList() (list []string) {
 			rightBracket := p.next()
 			if size.Type == lexer.RightSquareBracket {
 				list = append(list, "[]"+rightBracket.Value)
+				expectsComma = true
 				continue
 			}
 			typeName := p.next()
