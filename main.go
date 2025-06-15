@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"text/template"
 
-	language_go "github.com/ultravioletasdf/ideal/languages/go"
 	"github.com/ultravioletasdf/ideal/lexer"
 	"github.com/ultravioletasdf/ideal/parser"
 	"github.com/ultravioletasdf/ideal/validator"
@@ -22,6 +22,25 @@ var dtree = flag.Bool("dtree", false, "Specify whether to show debug information
 var compileGo = flag.Bool("go", false, "Specify whether to compile to go")
 var version bool
 
+var funcs = template.FuncMap{"join": strings.Join, "arrToNames": arrToNames, "arrToArguments": arrToArguments}
+
+func arrToNames(prefix string, arr []string) string {
+	var result []string
+	for i := range arr {
+		result = append(result, fmt.Sprintf("%s%d", prefix, i))
+	}
+	return strings.Join(result, ", ")
+}
+func arrToArguments(prefix string, arr []string, hasError bool) string {
+	var result []string
+	for i := range arr {
+		result = append(result, fmt.Sprintf("%s%d %s", prefix, i, arr[i]))
+	}
+	if hasError {
+		result = append(result, "err error")
+	}
+	return strings.Join(result, ", ")
+}
 func main() {
 	flag.BoolVar(&version, "v", false, "Alias to -version")
 	flag.BoolVar(&version, "version", false, "Check the version")
@@ -74,13 +93,34 @@ func main() {
 			fmt.Println(err)
 			os.Exit(1)
 		}
+		out := tree.Package
+		for i := range tree.Options {
+			if tree.Options[i].Name == "go_out" {
+				out = tree.Options[i].Value
+			}
+		}
+		os.MkdirAll(out, os.ModePerm)
+		filename := strings.TrimSuffix(path.Base(file.Name()), path.Ext(file.Name())) + ".idl.go"
+		file, err = os.Create(path.Join(out, filename))
+		if err != nil {
+			panic(err)
+		}
+
 		fmt.Println("No errors were detected")
-		if *compileGo {
-			compiler := language_go.NewCompiler(strings.TrimSuffix(path.Base(file.Name()), path.Ext(file.Name())), tree)
-			out := compiler.Compile()
-			cleanup(whitelist, out)
+		templates, err := template.New("template.tpl").Funcs(funcs).ParseFiles("compile/structs.tpl", "compile/services.tpl", "compile/clients.tpl", "compile/template.tpl")
+		if err != nil {
+			panic(err)
+		}
+		err = templates.Execute(file, struct {
+			Package    string
+			Structures []parser.StructureNode
+			Services   []parser.ServiceNode
+		}{Structures: tree.Structures, Package: tree.Package, Services: tree.Services})
+		if err != nil {
+			panic(err)
 		}
 		fmt.Println("Done!")
+		cleanup(whitelist, out)
 	}
 }
 func usage() {

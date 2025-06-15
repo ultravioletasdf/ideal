@@ -1,11 +1,10 @@
 package tests
 
 option go_out "tests_out"
-option string_size 64
 
 service User {
     Hello([3]string): [3]string
-    CreateUser(Crededentials): string
+    CreateUser(Crededentials): (string, error)
     VoidFunction: ()
     MultipleResults(): (First, Second, Third)
 }
@@ -19,7 +18,7 @@ struct Crededentials {
 struct OtherStruct {
     Creds Crededentials
     ExampleValue string
-    Array [20]int
+    Array []int
 }
 struct First {
     Info OtherStruct

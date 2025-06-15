@@ -1,11 +1,10 @@
 package tests
 
 option go_out "tests_out"
-option string_size 32
 
 service Second {
-    Hello(): ()
-    UberFunc(string, int, int8, int16, int32, int64, float, float32, float64, bool, [3]string, [3]int, [3]int8, [3]int16, [3]int32, [3]int64, [3]float, [3]float32, [3]float64, [3]bool, [3]Uber): (string, int, int8, int16, int32, int64, float, float32, float64, bool, [3]string, [3]int, [3]int8, [3]int16, [3]int32, [3]int64, [3]float, [3]float32, [3]float64, [3]bool, [3]Uber)
+    Hello([]string): ([]string)
+    UberFunc(string, int, int8, int16, int32, int64, float32, float64, bool, [3]string, [3]int, [3]int8, [3]int16, [3]int32, [3]int64, [3]float32, [3]float64, [3]bool, [3]Uber): (string, int, int8, int16, int32, int64, float32, float64, bool, [3]string, [3]int, [3]int8, [3]int16, [3]int32, [3]int64, [3]float32, [3]float64, [3]bool, [3]Uber)
 }
 struct Uber3 {
     String string
@@ -15,8 +14,8 @@ struct Uber3 {
     Int16 int16
     Int32 int32
     Int64 int64
+    Complex complex64
 
-    Float float
     Float32 float32
     Float64 float64
 
@@ -32,7 +31,6 @@ struct Uber2 {
     Int32 int32
     Int64 int64
 
-    Float float
     Float32 float32
     Float64 float64
 
@@ -48,7 +46,6 @@ struct Uber {
     Int32 int32
     Int64 int64
 
-    Float float
     Float32 float32
     Float64 float64
 
@@ -63,7 +60,6 @@ struct Uber {
     Int32Array [5]int32
     Int64Array [5]int64
 
-    FloatArray [5]float
     Float32Array [5]float32
     Float64Array [5]float64
 
@@ -71,4 +67,5 @@ struct Uber {
 
     Struct Uber2
     StructArray [5]Uber2
+    DynamicArray []string
 }

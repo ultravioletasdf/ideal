@@ -9,6 +9,8 @@ import (
 	"github.com/ultravioletasdf/ideal/lexer"
 )
 
+var Known = []string{"string", "int", "int8", "int16", "int32", "int64", "float64", "float32", "bool"}
+
 type Nodes struct {
 	Package    string
 	Options    []OptionNode
@@ -25,13 +27,10 @@ type ServiceNode struct {
 }
 type FunctionNode struct {
 	Name    string
-	Inputs  []Type
-	Outputs []Type
+	Inputs  []string
+	Outputs []string
 }
-type Type struct {
-	Type string
-	Size int
-}
+
 type StructureNode struct {
 	Name   string
 	Fields []FieldNode
@@ -39,7 +38,6 @@ type StructureNode struct {
 type FieldNode struct {
 	Name string
 	Type string
-	Size int
 }
 type Parser struct {
 	tokens []lexer.Token
@@ -124,19 +122,24 @@ func (p *Parser) parseFunction() FunctionNode {
 	if nextToken.Type != lexer.LeftBracket && nextToken.Type != lexer.Colon {
 		unexpected(nextToken, "( or :", nextToken.Value)
 	}
-	var inputs []Type
+	var inputs []string
 	if nextToken.Type == lexer.LeftBracket {
 		inputs = p.parseList()
 		p.next() // consume :
 	}
 	result := p.next()
-	var outputs []Type
+	var outputs []string
 	if result.Type == lexer.LeftBracket {
 		outputs = p.parseList()
 	} else if result.Type == lexer.LeftSquareBracket {
-		size := p.next()
-		rightBracket := p.next()
+		size := p.next()         // Could also be ]
+		rightBracket := p.next() // Could also be a type name
+		if size.Type == lexer.RightSquareBracket {
+			outputs = append(outputs, "[]"+rightBracket.Value)
+			goto skip
+		}
 		typeName := p.next()
+
 		if size.Type != lexer.Identifier {
 			unexpected(size, "an identifier", size.Value)
 		}
@@ -155,15 +158,16 @@ func (p *Parser) parseFunction() FunctionNode {
 		if rightBracket.Type != lexer.RightSquareBracket {
 			unexpected(rightBracket, "]", rightBracket.Value)
 		}
-		outputs = append(outputs, Type{Type: typeName.Value, Size: sizeInt})
+		outputs = append(outputs, fmt.Sprintf("[%d]%s", sizeInt, typeName.Value))
 	} else if result.Type != lexer.Identifier {
 		unexpected(result, "identifier", result.Value)
 	} else {
-		outputs = []Type{{Type: result.Value}}
+		outputs = []string{result.Value}
 	}
+skip:
 	return FunctionNode{Name: name, Inputs: inputs, Outputs: outputs}
 }
-func (p *Parser) parseList() (list []Type) {
+func (p *Parser) parseList() (list []string) {
 	expectsComma := false
 	for p.peek().Type != lexer.RightBracket {
 		token := p.next()
@@ -184,7 +188,12 @@ func (p *Parser) parseList() (list []Type) {
 		if token.Type == lexer.LeftSquareBracket {
 			size := p.next()
 			rightBracket := p.next()
+			if size.Type == lexer.RightSquareBracket {
+				list = append(list, "[]"+rightBracket.Value)
+				continue
+			}
 			typeName := p.next()
+
 			if size.Type != lexer.Identifier {
 				unexpected(size, "an identifier", size.Value)
 			}
@@ -203,10 +212,10 @@ func (p *Parser) parseList() (list []Type) {
 			if rightBracket.Type != lexer.RightSquareBracket {
 				unexpected(rightBracket, "]", rightBracket.Value)
 			}
-			list = append(list, Type{Type: typeName.Value, Size: sizeInt})
+			list = append(list, fmt.Sprintf("[%d]%s", sizeInt, typeName.Value))
 			expectsComma = true
 		} else if token.Type == lexer.Identifier {
-			list = append(list, Type{Type: token.Value})
+			list = append(list, token.Value)
 			expectsComma = true
 		} else {
 			unexpected(token, "identifier", token.Value)
@@ -233,8 +242,12 @@ func (p *Parser) parseStruct() StructureNode {
 		if one.Type != lexer.Identifier {
 			unexpected(one, "identifier", one.Value)
 		} else if two.Type == lexer.LeftSquareBracket {
-			size := p.next()
-			rightBracket := p.next()
+			size := p.next()         // Could also be ]
+			rightBracket := p.next() // Could also be a type name
+			if size.Type == lexer.RightSquareBracket {
+				fields = append(fields, FieldNode{Name: one.Value, Type: rightBracket.Value})
+				continue
+			}
 			typeName := p.next()
 			if size.Type != lexer.Identifier {
 				unexpected(size, "an identifier", size.Value)
@@ -254,7 +267,8 @@ func (p *Parser) parseStruct() StructureNode {
 			if rightBracket.Type != lexer.RightSquareBracket {
 				unexpected(rightBracket, "]", rightBracket.Value)
 			}
-			fields = append(fields, FieldNode{Name: one.Value, Type: typeName.Value, Size: sizeInt})
+			fields = append(fields, FieldNode{Name: one.Value, Type: fmt.Sprintf("[%d]%s", sizeInt, typeName.Value)})
+
 		} else if one.Type != lexer.Identifier || two.Type != lexer.Identifier {
 			fmt.Printf("%d:%d Expected two identifiers, got %v and %v\n", one.Pos.Line, one.Pos.Column, one.Value, two.Value)
 			os.Exit(1)

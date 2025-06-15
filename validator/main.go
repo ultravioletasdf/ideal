@@ -3,12 +3,18 @@ package validator
 import (
 	"errors"
 	"fmt"
+	"go/ast"
+	"go/importer"
+	goparser "go/parser"
+	"go/token"
+	"go/types"
+	"regexp"
 	"slices"
 
 	"github.com/ultravioletasdf/ideal/parser"
 )
 
-var known = []string{"string", "int", "int8", "int16", "int32", "int64", "float", "float64", "float32", "bool"}
+var arrayPrefixRegex = regexp.MustCompile(`^\[\d*\]`)
 
 type Validator struct {
 	tree         parser.Nodes
@@ -25,15 +31,16 @@ func (v *Validator) Validate() error {
 }
 func (v *Validator) validateStructs() error {
 	for _, structure := range v.tree.Structures {
-		if v.hasStruct(structure.Name) {
+		if v.validTypeOrStruct(structure.Name) {
 			return errors.New(fmt.Sprintf("Structure '%s' is already defined", structure.Name))
 		}
 		for _, field := range structure.Fields {
+			fieldType := arrayPrefixRegex.ReplaceAllString(field.Type, "")
 			if field.Type == structure.Name {
 				return errors.New(fmt.Sprintf("Cannot use '%s' as a type inside of itself", field.Type))
 			}
-			if !v.hasStruct(field.Type) {
-				return errors.New(fmt.Sprintf("Unknown structure '%s'", field.Type))
+			if !v.validTypeOrStruct(fieldType) {
+				return errors.New(fmt.Sprintf("Unknown structure '%s'", fieldType))
 			}
 		}
 		v.knownStructs = append(v.knownStructs, structure.Name)
@@ -44,22 +51,42 @@ func (v *Validator) validateServices() error {
 	for _, service := range v.tree.Services {
 		for _, function := range service.Functions {
 			for _, input := range function.Inputs {
-				if !v.hasStruct(input.Type) {
-					return errors.New(fmt.Sprintf("Unknown structure %s", input.Type))
+				input = sanitizeType(input)
+				if !v.validTypeOrStruct(input) {
+					return errors.New(fmt.Sprintf("Unknown structure %s", input))
 				}
 			}
 			for _, output := range function.Outputs {
-				if !v.hasStruct(output.Type) {
-					return errors.New(fmt.Sprintf("Unknown structure %s", output.Type))
+				output = sanitizeType(output)
+				if !v.validTypeOrStruct(output) {
+					return errors.New(fmt.Sprintf("Unknown structure %s", output))
 				}
 			}
 		}
 	}
 	return nil
 }
-func (v *Validator) hasStruct(structure string) bool {
+func (v *Validator) validTypeOrStruct(structure string) bool {
+	if isValidType(structure) {
+		return true
+	}
 	return slices.Contains(v.knownStructs, structure)
 }
 func New(tree parser.Nodes) *Validator {
-	return &Validator{tree: tree, knownStructs: known}
+	return &Validator{tree: tree, knownStructs: parser.Known}
+}
+func sanitizeType(ft string) string {
+	return arrayPrefixRegex.ReplaceAllString(ft, "")
+}
+func isValidType(typeStr string) bool {
+	src := "package main\nvar x " + typeStr
+	fset := token.NewFileSet()
+	file, err := goparser.ParseFile(fset, "src.go", src, 0)
+	if err != nil {
+		return false
+	}
+
+	conf := types.Config{Importer: importer.Default()}
+	_, err = conf.Check("main", fset, []*ast.File{file}, nil)
+	return err == nil
 }
