@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -16,6 +17,9 @@ import (
 	"github.com/ultravioletasdf/ideal/parser"
 	"github.com/ultravioletasdf/ideal/validator"
 )
+
+//go:embed compile/*.tpl
+var templateFS embed.FS
 
 var dtokens = flag.Bool("dtokens", false, "Specify whether to show debug information for tokenization")
 var dtree = flag.Bool("dtree", false, "Specify whether to show debug information for parsing the AST")
@@ -47,7 +51,7 @@ func main() {
 	flag.Parse()
 	flag.Usage = usage
 	if version {
-		fmt.Println("Version is 1.0.2")
+		fmt.Println("Version is 1.0.3")
 	}
 	files := flag.Args()
 	if !version && len(files) == 0 {
@@ -107,7 +111,7 @@ func main() {
 		}
 
 		fmt.Println("No errors were detected")
-		templates, err := template.New("template.tpl").Funcs(funcs).ParseFiles("compile/structs.tpl", "compile/services.tpl", "compile/clients.tpl", "compile/template.tpl")
+		templates, err := template.New("template.tpl").Funcs(funcs).ParseFS(templateFS, "compile/*.tpl")
 		if err != nil {
 			panic(err)
 		}
